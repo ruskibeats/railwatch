@@ -4,7 +4,12 @@ Live Hemel Hempstead <-> London Euston board and alerts (TEC-427). Data: Nationa
 
 ## What runs
 
-`rail-board.timer` fires `rail-board.service` every 2 minutes. The runner
+`rail-board.timer` fires `rail-board.service` every 2 minutes. The service runs
+the **root-owned copy at `/opt/uclh/railwatch`**, not the agent-writable
+checkout: it needs root for the SSH hop to caddy and to read
+`/etc/uclh-rail/config.json`. The drop-in
+`systemd/rail-board.service.d/root-copy.conf` sets `User=root` and
+`ExecStart=/opt/uclh/railwatch/rail/run.mjs`. The runner
 (`rail/run.mjs`) does the real gating, so the timer itself is dumb:
 
 | Gate | Rule |
@@ -26,8 +31,8 @@ direction, and sends each new alert once (TEC-430 rules).
 | `rail/run.mjs` | window/date gates, fetch, publish, notify, state |
 | `rail/holidays.mjs` | gov.uk bank holidays, daily cache, stale fallback |
 | `rail/notify.mjs` | caddy `/api/whatsapp/notify` (same route as `snow-freshness`) |
-| `systemd/` | `rail-board.service` + `rail-board.timer` |
-| `install.sh` | install / upgrade / `--backout` (root) |
+| `systemd/` | `rail-board.service`, `rail-board.timer`, `rail-board.service.d/root-copy.conf` |
+| `install.sh` | copy to `/opt/uclh/railwatch`, install units + drop-in, `--backout` (root) |
 
 ## Config and secrets
 
@@ -49,9 +54,25 @@ fetches from LDBWS and writes the publish/state files, so it is not a full
 offline mode. Transient LDBWS failures (429/5xx) set a cooldown in the state
 file (2, 4, 8, 10 minutes) so the 2-minute timer does not hammer the API.
 
-## Install
+## Install and upgrade
 
-`sudo ./install.sh` backs up any existing units, installs them, enables the timer,
-and prints a read-back (`is-enabled`, `is-active`, `list-timers`).
-`sudo ./install.sh --backout` disables and removes the timer and restores the backup.
+`sudo ./install.sh`:
+
+1. copies this tree (minus `.git`) to `/opt/uclh/railwatch`, owned by root;
+2. creates `/var/lib/uclh-rail` and `/srv/estate/publish/rail` (owned by `paperclip`);
+3. creates `/etc/uclh-rail/config.json` from the example if missing;
+4. backs up the current units, then installs `rail-board.service`, `rail-board.timer`
+   and the `rail-board.service.d/root-copy.conf` drop-in;
+5. reloads systemd, enables the timer, and prints a read-back (`is-enabled`,
+   `is-active`, the effective `User`/`ExecStart`, `list-timers`).
+
+**Upgrade** = run `sudo ./install.sh` again from the checkout after `main` moves;
+it re-copies the tree and reinstalls the units. Running it from `/opt/uclh/railwatch`
+itself skips the copy step.
+
+`sudo ./install.sh --backout` disables and removes the timer, the unit files and the
+drop-in, then restores the last backup of each. It leaves `/opt/uclh/railwatch`,
+the state dir and the publish dir in place.
+
+`sudo ./install.sh --dry` prints the plan and changes nothing.
 Q&R PASS is the approval to install.
