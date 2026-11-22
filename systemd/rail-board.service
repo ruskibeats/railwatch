@@ -6,7 +6,9 @@ Wants=network-online.target
 
 [Service]
 Type=oneshot
+# The live service runs the root-owned copy at /opt/uclh/railwatch as root.
+# systemd/rail-board.service.d/root-copy.conf sets that; install.sh puts both in place.
 User=paperclip
 Group=paperclip
 EnvironmentFile=/etc/uclh-rail/ldbws.env
-ExecStart=/usr/bin/node /home/paperclip/projects/railwatch/rail/run.mjs
+ExecStart=/usr/bin/node /opt/uclh/railwatch/rail/run.mjs
