@@ -1,0 +1,39 @@
+{
+  "generatedAt": "2026-11-23T17:00:00Z",
+  "locationName": "London Euston",
+  "crs": "EUS",
+  "filterLocationName": "Hemel Hempstead",
+  "filtercrs": "HML",
+  "filterType": "to",
+  "platformAvailable": true,
+  "areServicesAvailable": true,
+  "nrccMessages": [],
+  "trainServices": [
+    {
+      "serviceID": "EUS-HML-1703",
+      "rsid": "R1703",
+      "std": "17:03",
+      "etd": "17:03",
+      "platform": "12",
+      "operator": "London Northwestern Railway",
+      "operatorCode": "LM",
+      "isCancelled": false,
+      "delayReason": null,
+      "origin": [{ "locationName": "London Euston", "crs": "EUS", "via": null }],
+      "destination": [{ "locationName": "Milton Keynes Central", "crs": "MKC", "via": null }]
+    },
+    {
+      "serviceID": "EUS-HML-1718",
+      "rsid": "R1718",
+      "std": "17:18",
+      "etd": "Delayed",
+      "platform": "14",
+      "operator": "London Northwestern Railway",
+      "operatorCode": "LM",
+      "isCancelled": false,
+      "delayReason": "Earlier train fault",
+      "origin": [{ "locationName": "London Euston", "crs": "EUS", "via": null }],
+      "destination": [{ "locationName": "Milton Keynes Central", "crs": "MKC", "via": null }]
+    }
+  ]
+}

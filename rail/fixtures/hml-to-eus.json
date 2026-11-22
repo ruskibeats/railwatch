@@ -1,0 +1,53 @@
+{
+  "generatedAt": "2026-11-23T07:00:00Z",
+  "locationName": "Hemel Hempstead",
+  "crs": "HML",
+  "filterLocationName": "London Euston",
+  "filtercrs": "EUS",
+  "filterType": "to",
+  "platformAvailable": true,
+  "areServicesAvailable": true,
+  "nrccMessages": [],
+  "trainServices": [
+    {
+      "serviceID": "HML-EUS-0712",
+      "rsid": "R0712",
+      "std": "07:12",
+      "etd": "On time",
+      "platform": "1",
+      "operator": "London Northwestern Railway",
+      "operatorCode": "LM",
+      "isCancelled": false,
+      "delayReason": null,
+      "origin": [{ "locationName": "Hemel Hempstead", "crs": "HML", "via": null }],
+      "destination": [{ "locationName": "London Euston", "crs": "EUS", "via": null }]
+    },
+    {
+      "serviceID": "HML-EUS-0727",
+      "rsid": "R0727",
+      "std": "07:27",
+      "etd": "07:34",
+      "platform": "2",
+      "operator": "London Northwestern Railway",
+      "operatorCode": "LM",
+      "isCancelled": false,
+      "delayReason": "Signalling fault near Watford Junction",
+      "origin": [{ "locationName": "Hemel Hempstead", "crs": "HML", "via": null }],
+      "destination": [{ "locationName": "London Euston", "crs": "EUS", "via": null }]
+    },
+    {
+      "serviceID": "HML-EUS-0742",
+      "rsid": "R0742",
+      "std": "07:42",
+      "etd": "Cancelled",
+      "platform": null,
+      "operator": "London Northwestern Railway",
+      "operatorCode": "LM",
+      "isCancelled": true,
+      "cancelReason": "Train crew shortage",
+      "delayReason": null,
+      "origin": [{ "locationName": "Hemel Hempstead", "crs": "HML", "via": null }],
+      "destination": [{ "locationName": "London Euston", "crs": "EUS", "via": null }]
+    }
+  ]
+}
