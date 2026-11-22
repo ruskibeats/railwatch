@@ -22,7 +22,7 @@ test('cancelled: one message, then never again', () => {
   assert.equal(first.messages.length, 1);
   assert.equal(first.messages[0].kind, 'cancelled');
   assert.equal(first.messages[0].key, 'HML-EUS-0712|cancelled|cancelled');
-  assert.equal(first.messages[0].text, '07:12 HML\u2192EUS is cancelled.');
+  assert.equal(first.messages[0].text, '❌🚆 07:12 HML\u2192EUS is cancelled.');
   assert.equal(first.nextState.sent['HML-EUS-0712|cancelled|cancelled'], true);
 
   const second = decide(first.nextState, board, now);
@@ -52,7 +52,7 @@ test('expected 5 min or more late alerts; 4 min does not', () => {
   assert.equal(late0[0].kind, 'late');
   assert.equal(late0[0].value, '07:20');
   assert.equal(late0[0].key, 'HML-EUS-0712|late|07:20');
-  assert.equal(late0[0].text, '07:12 HML\u2192EUS expected 07:20 (8 min late).');
+  assert.equal(late0[0].text, '🐢🚆 07:12 HML\u2192EUS expected 07:20 (8 min late).');
   assert.deepEqual(byId(r, 'HML-EUS-0727'), []);
 });
 
@@ -101,7 +101,7 @@ test('platform change within 10 min alerts once', () => {
   assert.equal(m[0].kind, 'platform');
   assert.equal(m[0].value, '2');
   assert.equal(m[0].key, 'HML-EUS-0712|platform|2');
-  assert.equal(m[0].text, '07:08 HML\u2192EUS platform changed 1 \u2192 2.');
+  assert.equal(m[0].text, '🔀🚉 07:08 HML\u2192EUS platform changed 1 \u2192 2.');
 
   const repeat = decide(changed.nextState, board, now);
   assert.deepEqual(repeat.messages, []);
@@ -138,7 +138,7 @@ test('recovery: a late train back on time gets one message, then no repeat', () 
   assert.equal(m.length, 1);
   assert.equal(m[0].kind, 'ontime');
   assert.equal(m[0].key, 'HML-EUS-0712|ontime|ontime');
-  assert.equal(m[0].text, '07:12 HML\u2192EUS is now on time.');
+  assert.equal(m[0].text, '✅🚆 07:12 HML\u2192EUS is now on time.');
 
   const repeat = decide(back.nextState, board, now);
   assert.deepEqual(repeat.messages, []);

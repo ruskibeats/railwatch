@@ -93,7 +93,7 @@ export function decide(prevState, board, now) {
     const label = `${s.std ?? '?'} ${from}\u2192${to}`;
 
     if (s.cancelled === true || s.etd === 'Cancelled') {
-      emit(s.id, 'cancelled', 'cancelled', `${label} is cancelled.`);
+      emit(s.id, 'cancelled', 'cancelled', `❌🚆 ${label} is cancelled.`);
       continue;
     }
 
@@ -104,11 +104,11 @@ export function decide(prevState, board, now) {
 
     if (isLate) {
       const text = isDelayedText
-        ? `${label} is delayed (no estimate yet).`
-        : `${label} expected ${s.etd} (${etdMin - stdMin} min late).`;
+        ? `⏳🚆 ${label} is delayed (no estimate yet).`
+        : `🐢🚆 ${label} expected ${s.etd} (${etdMin - stdMin} min late).`;
       emit(s.id, 'late', s.etd, text);
     } else if (s.etd === 'On time' && wasLate(prevSent, s.id)) {
-      emit(s.id, 'ontime', 'ontime', `${label} is now on time.`);
+      emit(s.id, 'ontime', 'ontime', `✅🚆 ${label} is now on time.`);
     }
 
     // Platform reference: first sight sets it. Inside the 10-minute window a
@@ -127,7 +127,7 @@ export function decide(prevState, board, now) {
       reference != null &&
       s.platform !== reference
     ) {
-      emit(s.id, 'platform', s.platform, `${label} platform changed ${reference} \u2192 ${s.platform}.`);
+      emit(s.id, 'platform', s.platform, `🔀🚉 ${label} platform changed ${reference} \u2192 ${s.platform}.`);
       reference = s.platform;
     }
     nextLast[s.id] = { platform: reference };
