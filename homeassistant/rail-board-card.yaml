@@ -1,0 +1,32 @@
+# Rail board card (TEC-432). Paste as a Lovelace card (Manual, YAML) on any
+# dashboard. It reads sensor.rail_board, set up by packages/rail_board.yaml.
+#
+# The status words mirror rail/board.mjs `statusText` (tested in
+# rail/board.test.mjs): Cancelled, "On time", "Delayed", or the expected time
+# with "(+n)" when it is later than the scheduled time.
+type: markdown
+title: Hemel Hempstead - London Euston
+content: >-
+  {% set boards = state_attr('sensor.rail_board', 'boards') or [] %}
+  {% if boards | length == 0 %}
+  Board unavailable.
+  {% else %}
+  {% for b in boards %}
+  ### {{ b.fromName }} - {{ b.toName }}
+  {% for s in b.services %}
+  {% set late = (s.etd.split(':')[0] | int) * 60 + (s.etd.split(':')[1] | int)
+     - (s.std.split(':')[0] | int) * 60 - (s.std.split(':')[1] | int)
+     if s.etd is string and s.etd.split(':') | length == 2 else none %}
+  - **{{ s.std }}**
+    {%- if s.cancelled -%} Cancelled
+    {%- elif s.etd == 'On time' -%} on time
+    {%- elif s.etd == 'Delayed' -%} Delayed
+    {%- elif late is not none and late > 0 -%} {{ s.etd }} (+{{ late }})
+    {%- else -%} {{ s.etd or s.std }}
+    {%- endif -%}
+    {%- if s.platform %} · plt {{ s.platform }}{% endif -%}
+    {%- if s.delayReason %} · {{ s.delayReason }}{% endif %}
+  {% endfor %}
+  {% endfor %}
+  _Updated {{ state_attr('sensor.rail_board', 'generatedAt') }}_
+  {% endif %}

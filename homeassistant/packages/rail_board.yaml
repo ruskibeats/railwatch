@@ -1,0 +1,26 @@
+# Home Assistant rail board (TEC-432)
+#
+# Reads the file rail 3 publishes: /srv/estate/publish/rail/board.json
+# Include this package from configuration.yaml:
+#   homeassistant:
+#     packages: !include_dir_named packages
+#
+# Required secret (configuration.yaml `secrets.yaml`):
+#   rail_board_url: "http://<host>:<port>/rail/board.json"
+# The URL must answer on the HA host. See homeassistant/README.md for the
+# two supported ways to expose /srv/estate/publish/rail/board.json.
+#
+# One entity: sensor.rail_board. Its `boards` attribute is the feed's boards
+# array, which the rail-board card renders. Poll is 2 minutes, same cadence as
+# the producer.
+
+rest:
+  - resource: !secret rail_board_url
+    scan_interval: 120
+    timeout: 10
+    sensor:
+      - name: Rail board
+        unique_id: rail_board
+        value_template: "{{ value_json.generatedAt }}"
+        json_attributes:
+          - boards
