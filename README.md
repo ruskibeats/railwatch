@@ -20,7 +20,20 @@ checkout: it needs root for the SSH hop to caddy and to read
 | off date | no poll (`off:` in `/etc/uclh-rail/config.json`) |
 
 Inside a window it makes one call per direction, publishes the latest board per
-direction, and sends each new alert once (TEC-430 rules).
+direction, and sends each new alert once.
+
+### Alert rules
+
+The rules live in `rail/alerts.mjs` (TEC-430). Each alert is sent once per
+`serviceId|kind|value`; the sent keys are kept in the state file and pruned to
+the services on the current board.
+
+| Alert | When |
+| --- | --- |
+| Cancelled | a service is cancelled |
+| Late | expected departure is 5 or more minutes after the scheduled time, or the estimate is `Delayed` with no time |
+| Platform change | the platform changes within 10 minutes of departure |
+| On time again | a train that was alerted late is `On time` again |
 
 ## Files
 
@@ -39,8 +52,8 @@ direction, and sends each new alert once (TEC-430 rules).
 - `/etc/uclh-rail/ldbws.env` (root 600): `LDBWS_URL`, `LDBWS_KEY`. Never logged or committed.
 - `/etc/uclh-rail/config.json` (root 600, from `config.example.json`): WhatsApp number,
   `off:` dates, publish/state dirs, caddy notify settings. Never committed.
-- State (`/var/lib/uclh-rail`) and published output (`/srv/estate/publish/rail/board.json`)
-  are never committed.
+- State (`/var/lib/uclh-rail/alerts.json`, plus the `bank-holidays.json` cache)
+  and published output (`/srv/estate/publish/rail/board.json`) are never committed.
 
 ## Run it
 
@@ -53,6 +66,17 @@ node --test               # all rules, no network
 fetches from LDBWS and writes the publish/state files, so it is not a full
 offline mode. Transient LDBWS failures (429/5xx) set a cooldown in the state
 file (2, 4, 8, 10 minutes) so the 2-minute timer does not hammer the API.
+
+## Stop it
+
+```sh
+sudo systemctl disable --now rail-board.timer
+```
+
+This stops the timer and stops it from starting again at boot. The service is
+`Type=oneshot`, so there is no long-running process to kill and an in-flight run
+finishes. To pause only, stop the timer and start it again later; to remove the
+units and drop-in completely, run `sudo ./install.sh --backout` (see below).
 
 ## Install and upgrade
 
