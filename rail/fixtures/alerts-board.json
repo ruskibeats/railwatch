@@ -1,0 +1,36 @@
+{
+  "generatedAt": "2026-11-23T07:00:00Z",
+  "locationName": "Hemel Hempstead",
+  "crs": "HML",
+  "filterCrs": "EUS",
+  "platformAvailable": true,
+  "services": [
+    {
+      "id": "HML-EUS-0712",
+      "std": "07:12",
+      "etd": "On time",
+      "platform": "1",
+      "cancelled": false,
+      "delayReason": null,
+      "operator": "London Northwestern Railway"
+    },
+    {
+      "id": "HML-EUS-0727",
+      "std": "07:27",
+      "etd": "On time",
+      "platform": "2",
+      "cancelled": false,
+      "delayReason": null,
+      "operator": "London Northwestern Railway"
+    },
+    {
+      "id": "HML-EUS-0742",
+      "std": "07:42",
+      "etd": "On time",
+      "platform": "3",
+      "cancelled": false,
+      "delayReason": null,
+      "operator": "London Northwestern Railway"
+    }
+  ]
+}
