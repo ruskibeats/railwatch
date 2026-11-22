@@ -1,0 +1,12 @@
+[Unit]
+Description=Rail board poll (Hemel Hempstead <-> London Euston)
+Documentation=https://github.com/ruskibeats/railwatch
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+User=paperclip
+Group=paperclip
+EnvironmentFile=/etc/uclh-rail/ldbws.env
+ExecStart=/usr/bin/node /home/paperclip/projects/railwatch/rail/run.mjs
