@@ -1,0 +1,12 @@
+{
+  "to": "<russell whatsapp number, digits only>",
+  "off": [],
+  "publishDir": "/srv/estate/publish/rail",
+  "stateDir": "/var/lib/uclh-rail",
+  "notify": {
+    "caddy": "root@192.168.18.25",
+    "remoteEnvFile": "/opt/desktop-swap-app-v2/desktop-swap-app-v2/.env",
+    "tokenEnv": "SNOW_DRAINER_TOKEN",
+    "endpoint": "http://127.0.0.1:3003/api/whatsapp/notify"
+  }
+}

@@ -57,7 +57,11 @@ export async function getBoard({ from, to, window = 120, numRows = 9, fetchImpl 
   });
   if (!res.ok) {
     // Deliberately no request headers or URL key in the message.
-    throw new Error(`LDBWS request failed: HTTP ${res.status} ${res.statusText}`);
+    const err = new Error(`LDBWS request failed: HTTP ${res.status} ${res.statusText}`);
+    err.status = res.status;
+    // 429 and 5xx are transient: the runner backs off and retries.
+    err.retryable = res.status === 429 || res.status >= 500;
+    throw err;
   }
 
   const board = await res.json();
