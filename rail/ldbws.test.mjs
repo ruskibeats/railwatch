@@ -112,6 +112,28 @@ test('HTTP error does not leak the credentials or header', async () => {
   );
 });
 
+test('429 and 5xx are marked retryable, 4xx is not', async () => {
+  for (const status of [429, 500, 503]) {
+    const { impl } = fakeFetch({}, { ok: false, status, statusText: 'Transient' });
+    await assert.rejects(
+      () => getBoard({ from: 'HML', to: 'EUS', fetchImpl: impl }),
+      (err) => {
+        assert.equal(err.status, status);
+        assert.equal(err.retryable, true);
+        return true;
+      },
+    );
+  }
+  const { impl } = fakeFetch({}, { ok: false, status: 400, statusText: 'Bad Request' });
+  await assert.rejects(
+    () => getBoard({ from: 'HML', to: 'EUS', fetchImpl: impl }),
+    (err) => {
+      assert.equal(err.retryable, false);
+      return true;
+    },
+  );
+});
+
 test('rejects lowercase or non-3-letter CRS codes', async () => {
   const { impl } = fakeFetch(fixture('hml-to-eus.json'));
   await assert.rejects(() => getBoard({ from: 'hml', to: 'EUS', fetchImpl: impl }), /from must be/);

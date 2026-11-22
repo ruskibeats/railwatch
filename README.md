@@ -40,9 +40,14 @@ direction, and sends each new alert once (TEC-430 rules).
 ## Run it
 
 ```sh
-node rail/run.mjs --dry   # gate check + print, no fetch outside a window, no send
+node rail/run.mjs --dry   # gate check + print, no send
 node --test               # all rules, no network
 ```
+
+`--dry` only suppresses the WhatsApp send. Inside an open window it still
+fetches from LDBWS and writes the publish/state files, so it is not a full
+offline mode. Transient LDBWS failures (429/5xx) set a cooldown in the state
+file (2, 4, 8, 10 minutes) so the 2-minute timer does not hammer the API.
 
 ## Install
 
