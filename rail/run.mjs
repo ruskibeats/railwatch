@@ -200,6 +200,8 @@ async function main() {
     });
     result = await runOnce({ now, config, holidays, send, writeText });
     if (result.skipped === 'fetch-error') throw new Error(`${result.window} fetch failed: ${result.error}`);
+    // A long LDBWS outage (429/5xx) is just as silent as a hard failure.
+    if (result.failures >= 3) throw new Error(`${result.window} LDBWS failing ${result.failures} times in a row: ${result.error}`);
   } catch (err) {
     await alertFailureOnce({ now, stateDir, reason: err.message, send, writeText });
     throw err;
