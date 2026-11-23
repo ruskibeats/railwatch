@@ -62,7 +62,7 @@ export function isOff(date, off = []) {
 }
 
 // Backoff for transient LDBWS failures (429/5xx): 2, 4, 8, 10, 10... minutes.
-// The timer still fires every 2 min, but runOnce returns early until the
+// The timer still fires every minute, but runOnce returns early until the
 // cooldown passes, so a run of 429s is hit once, not every tick.
 export const BACKOFF_BASE_MS = 2 * 60 * 1000;
 export const BACKOFF_MAX_MS = 10 * 60 * 1000;

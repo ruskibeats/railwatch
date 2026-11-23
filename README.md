@@ -4,7 +4,7 @@ Live Hemel Hempstead <-> London Euston board and alerts (TEC-427). Data: Nationa
 
 ## What runs
 
-`rail-board.timer` fires `rail-board.service` every 2 minutes. The service runs
+`rail-board.timer` fires `rail-board.service` every minute. The service runs
 the **root-owned copy at `/opt/uclh/railwatch`**, not the agent-writable
 checkout: it needs root for the SSH hop to caddy and to read
 `/etc/uclh-rail/config.json`. `rail-board.service` sets `User=root` and
