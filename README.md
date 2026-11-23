@@ -19,7 +19,9 @@ checkout: it needs root for the SSH hop to caddy and to read
 | off date | no poll (`off:` in `/etc/uclh-rail/config.json`) |
 
 Inside a window it makes one call per direction, publishes the latest board per
-direction, and sends each new alert once (TEC-430 rules).
+direction, and sends each new alert once. A delay alerts at 5, 10, 15... minutes
+late rather than on every change, and a train goes quiet 2 minutes after its
+booked time (a cancellation still alerts: it is the fallback train).
 
 ## Files
 

@@ -8,9 +8,15 @@
 //
 // Rules (TEC-430):
 //   - cancelled                          -> one message per train
-//   - expected >= 5 min late             -> one message per distinct etd
+//   - expected >= 5 min late             -> one message, then again only when
+//                                           the estimate moves 5+ min further
+//   - a train whose std has passed       -> no late/platform/timing alerts
+//     (std + 2 min grace); a cancellation still alerts
 //   - platform change within 10 min      -> one message per distinct platform
 //   - "Delayed" with no time             -> treated as a delay, one message
+//   - after its booked time a train is silent. Darwin keeps a departed service
+//     listed and still moving its estimate, so without this every departure
+//     produced "delayed" messages minutes after the train left
 //   - a train we alerted a delay for
 //     that is "On time" again            -> one "now on time" message
 //
@@ -36,6 +42,17 @@ const LONDON = new Intl.DateTimeFormat('en-GB', {
 });
 
 const HHMM = /^(\d{1,2}):(\d{2})$/;
+
+// Alert on the first 5+ min delay, then only when it gets 5 min worse:
+// "Now 18:11, 5 min late", "Now 18:16, 10 min late", not every minute.
+const LATE_STEP_MIN = 5;
+// A train is treated as gone 2 min after its booked time (Darwin keeps showing
+// it as "On time" for a while after it leaves).
+const GONE_GRACE_MIN = 2;
+
+function lateBucket(lateMin) {
+  return Math.floor(lateMin / LATE_STEP_MIN) * LATE_STEP_MIN;
+}
 
 function toMinutes(value) {
   if (typeof value !== 'string') return null;
@@ -83,9 +100,16 @@ function nextRunning(services, after) {
   return `Next: ${n.std}`;
 }
 
-function wasLate(sent, serviceId) {
+// The worst delay bucket already alerted for this train, or null.
+function lateBucketSent(sent, serviceId) {
   const prefix = `${serviceId}|late|`;
-  return Object.keys(sent).some((key) => key.startsWith(prefix));
+  let worst = null;
+  for (const key of Object.keys(sent)) {
+    if (!key.startsWith(prefix)) continue;
+    const bucket = Number(key.slice(prefix.length).replace('delayed', '0'));
+    if (Number.isFinite(bucket) && (worst === null || bucket > worst)) worst = bucket;
+  }
+  return worst;
 }
 
 export function decide(prevState, board, now) {
@@ -131,12 +155,21 @@ export function decide(prevState, board, now) {
     const isDelayedText = s.etd === 'Delayed';
     const isLate = isDelayedText || (stdMin !== null && etdMin !== null && etdMin - stdMin >= 5);
 
+    // Once the booked time has passed, Darwin's estimate is no longer news.
+    const gone = stdMin !== null && nowMin > stdMin + GONE_GRACE_MIN;
+
     if (isLate) {
-      const text = isDelayedText
-        ? lines(`⏳🚆 ${label} delayed`, 'No estimate yet', s.delayReason)
-        : lines(`🐢🚆 ${label} delayed`, `Now ${s.etd}, ${etdMin - stdMin} min late`, s.delayReason);
-      emit(s.id, 'late', s.etd, text);
-    } else if (s.etd === 'On time' && wasLate(prevSent, s.id)) {
+      const lateMin = isDelayedText ? null : etdMin - stdMin;
+      const bucket = lateMin === null ? null : lateBucket(lateMin);
+      const worst = lateBucketSent(prevSent, s.id);
+      const worth = !gone && (bucket === null ? worst === null : worst === null || bucket > worst);
+      if (worth) {
+        const text = isDelayedText
+          ? lines(`⏳🚆 ${label} delayed`, 'No estimate yet', s.delayReason)
+          : lines(`🐢🚆 ${label} delayed`, `Now ${s.etd}, ${lateMin} min late`, s.delayReason);
+        emit(s.id, 'late', isDelayedText ? 'delayed' : String(bucket), text);
+      }
+    } else if (s.etd === 'On time' && !gone && lateBucketSent(prevSent, s.id) !== null) {
       emit(s.id, 'ontime', 'ontime', lines(`✅🚆 ${label} on time again`));
     }
 
@@ -146,7 +179,7 @@ export function decide(prevState, board, now) {
     const prevEntry = prevLast[s.id];
     const departure = etdMin ?? stdMin;
     const minsUntil = departure === null ? null : departure - nowMin;
-    const withinWindow = minsUntil !== null && minsUntil >= 0 && minsUntil <= 10;
+    const withinWindow = !gone && minsUntil !== null && minsUntil >= 0 && minsUntil <= 10;
 
     let reference = prevEntry === undefined ? (s.platform ?? null) : (prevEntry.platform ?? null);
     if (

@@ -50,8 +50,8 @@ test('expected 5 min or more late alerts; 4 min does not', () => {
   const late0 = byId(r, 'HML-EUS-0712');
   assert.equal(late0.length, 1);
   assert.equal(late0[0].kind, 'late');
-  assert.equal(late0[0].value, '07:20');
-  assert.equal(late0[0].key, 'HML-EUS-0712|late|07:20');
+  assert.equal(late0[0].value, '5');
+  assert.equal(late0[0].key, 'HML-EUS-0712|late|5');
   assert.equal(late0[0].text, '*```🐢🚆 07:12 HML\u2192EUS delayed```*\n\n*```Now 07:20, 8 min late```*');
   assert.deepEqual(byId(r, 'HML-EUS-0727'), []);
 });
@@ -69,7 +69,7 @@ test('the same delay is not repeated, a worse one is', () => {
   const third = decide(second.nextState, board, now);
   const m = byId(third, 'HML-EUS-0712');
   assert.equal(m.length, 1);
-  assert.equal(m[0].value, '07:26');
+  assert.equal(m[0].value, '10');
 });
 
 test('"Delayed" with no time alerts once, as a delay with no estimate', () => {
@@ -80,7 +80,7 @@ test('"Delayed" with no time alerts once, as a delay with no estimate', () => {
   const m = byId(first, 'HML-EUS-0712');
   assert.equal(m.length, 1);
   assert.equal(m[0].kind, 'late');
-  assert.equal(m[0].value, 'Delayed');
+  assert.equal(m[0].value, 'delayed');
   assert.match(m[0].text, /delayed```\*\n\n\*```No estimate yet```\*$/);
 
   const second = decide(first.nextState, board, now);
@@ -180,4 +180,32 @@ test('cancelled last train on the board: no Next line', () => {
   last.etd = 'Cancelled';
   const m = decide({}, board, now).messages.find((x) => x.kind === 'cancelled');
   assert.equal(m.text, '*```❌🚆 ' + last.std + ' HML\u2192EUS cancelled```*');
+});
+
+test('a train that has left gets no late, recovery or platform alert', () => {
+  const board = fixture();
+  board.services[0].etd = '07:20'; // 8 min late
+  board.services[0].platform = '1';
+  // 07:05, already late for a 07:12 booked time: one alert, as before.
+  const first = decide({}, board, new Date('2026-11-23T07:05:00Z'));
+  assert.equal(byId(first, 'HML-EUS-0712').length, 1);
+
+  // 07:15, three minutes after the booked time: gone, no late and no platform.
+  const after = new Date('2026-11-23T07:15:00Z');
+  board.services[0].etd = '07:16';
+  board.services[0].platform = '2';
+  assert.deepEqual(decide(first.nextState, board, after).messages, []);
+
+  // Inside the grace (booked 07:05, now 07:06) a delay still alerts.
+  board.services[0].std = '07:05';
+  const grace = decide({}, board, new Date('2026-11-23T07:06:00Z'));
+  assert.equal(byId(grace, 'HML-EUS-0712').length, 1);
+});
+
+test('a cancelled train still alerts after its booked time', () => {
+  const board = fixture();
+  board.services[0].cancelled = true;
+  board.services[0].etd = 'Cancelled';
+  const r = decide({}, board, new Date('2026-11-23T07:30:00Z'));
+  assert.equal(byId(r, 'HML-EUS-0712')[0].kind, 'cancelled');
 });

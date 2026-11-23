@@ -130,6 +130,28 @@ test('off date in config is skipped', async () => {
 
 // --- runOnce happy path ----------------------------------------------------
 
+test('a train that has left is published but sends no late alert', async () => {
+  const { impl } = fakeFetch(fixture('hml-to-eus.json'));
+  const fs = memoryFs();
+  const sent = [];
+  const r = await runOnce({
+    now: new Date('2026-11-23T08:00:00Z'),
+    config: CONFIG,
+    fetchImpl: impl,
+    readText: fs.readText,
+    writeText: fs.writeText,
+    send: async (t) => {
+      sent.push(t);
+      return true;
+    },
+  });
+  // Every train is gone by 08:00; only the cancellation still matters.
+  assert.deepEqual(r.messages.map((m) => m.kind), ['cancelled']);
+  assert.equal(sent.length, 1);
+  const board = JSON.parse(fs.files.get('/srv/estate/publish/rail/board.json'));
+  assert.equal(board.directions['HML-EUS'].services.length, 3);
+  assert.ok(fs.files.get('/srv/estate/publish/rail/board.json').includes('07:40'));
+});
 test('morning poll fetches HML->EUS, publishes the board and sends each alert once', async () => {
   const { impl, calls } = fakeFetch(fixture('hml-to-eus.json'));
   const fs = memoryFs();
@@ -140,7 +162,7 @@ test('morning poll fetches HML->EUS, publishes the board and sends each alert on
   };
 
   const first = await runOnce({
-    now: new Date('2026-11-23T07:30:00Z'),
+    now: new Date('2026-11-23T07:20:00Z'),
     config: CONFIG,
     fetchImpl: impl,
     readText: fs.readText,
@@ -155,7 +177,7 @@ test('morning poll fetches HML->EUS, publishes the board and sends each alert on
   assert.match(calls[0], /filterCrs=EUS/);
   assert.match(calls[0], /filterType=to/);
 
-  // 07:27 is 7 min late, 07:42 is cancelled.
+  // 07:27 is 7 min late, 07:42 is cancelled. 07:40 is still to come.
   assert.deepEqual(first.messages.map((m) => m.kind).sort(), ['cancelled', 'late']);
   assert.equal(first.sent, 2);
   assert.equal(sent.length, 2);
@@ -166,7 +188,7 @@ test('morning poll fetches HML->EUS, publishes the board and sends each alert on
 
   // Second poll: same board, no repeat.
   const second = await runOnce({
-    now: new Date('2026-11-23T07:32:00Z'),
+    now: new Date('2026-11-23T07:22:00Z'),
     config: CONFIG,
     fetchImpl: impl,
     readText: fs.readText,
@@ -195,7 +217,7 @@ test('publish keeps the other direction and a platform change alerts once', asyn
   };
 
   await runOnce({
-    now: new Date('2026-11-23T07:30:00Z'),
+    now: new Date('2026-11-23T07:20:00Z'),
     config: CONFIG,
     fetchImpl: impl,
     readText: fs.readText,
@@ -203,10 +225,10 @@ test('publish keeps the other direction and a platform change alerts once', asyn
     send,
   });
 
-  // The second run sees platform 2 -> 5 inside the 10-minute window.
+  // The second run sees platform 2 -> 5 8 minutes out, inside the window.
   changed.trainServices[1].platform = '5';
   const r = await runOnce({
-    now: new Date('2026-11-23T07:31:00Z'),
+    now: new Date('2026-11-23T07:26:00Z'),
     config: CONFIG,
     fetchImpl: impl,
     readText: fs.readText,
@@ -242,7 +264,7 @@ test('a failed send is retried on the next tick instead of being marked sent', a
     send,
   });
   assert.equal(first.sent, 0);
-  assert.equal(first.failed.length, 2);
+  assert.equal(first.failed.length, 1);
 
   fail = false;
   const second = await runOnce({
@@ -253,7 +275,7 @@ test('a failed send is retried on the next tick instead of being marked sent', a
     writeText: fs.writeText,
     send,
   });
-  assert.equal(second.sent, 2);
+  assert.equal(second.sent, 1);
   assert.equal(second.failed.length, 0);
 });
 

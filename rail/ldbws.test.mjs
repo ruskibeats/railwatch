@@ -34,7 +34,7 @@ test('HML to EUS: normalises each service to the agreed shape', async () => {
 
   assert.deepEqual(board.services[0], {
     id: 'HML-EUS-0712',
-    std: '07:12',
+    std: '07:40',
     etd: 'On time',
     platform: '1',
     cancelled: false,
@@ -80,7 +80,7 @@ test('empty board gives an empty service list', async () => {
 });
 
 test('etd "Cancelled" alone marks the service cancelled', async () => {
-  const { impl } = fakeFetch({ trainServices: [{ serviceID: 'X1', std: '07:12', etd: 'Cancelled' }] });
+  const { impl } = fakeFetch({ trainServices: [{ serviceID: 'X1', std: '07:40', etd: 'Cancelled' }] });
   const board = await getBoard({ from: 'HML', to: 'EUS', fetchImpl: impl });
   assert.equal(board.services[0].cancelled, true);
 });
