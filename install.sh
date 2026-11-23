@@ -92,7 +92,8 @@ do_install() {
   backup_units
   remove_old_dropin
   for f in "${UNITS[@]}"; do
-    install -m 0644 "$REPO_DIR/systemd/$f" "$UNIT_DIR/$f"
+    # From the committed copy, so the units match the code that runs.
+    install -m 0644 "$RUNTIME_DIR/systemd/$f" "$UNIT_DIR/$f"
   done
 
   systemctl daemon-reload

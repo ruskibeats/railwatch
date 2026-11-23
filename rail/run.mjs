@@ -133,8 +133,14 @@ export async function runOnce({
   if (failed.size === 0) {
     state[key] = nextState;
   } else {
-    const sentState = { ...nextState.sent };
-    for (const m of messages) if (failed.has(m.key)) delete sentState[m.key];
+    // A train with a failed send keeps its previous keys, so the next tick makes
+    // the same decision again (an "on time again" also clears the late keys).
+    const prevSent = state[key]?.sent ?? {};
+    const retry = new Set(messages.filter((m) => failed.has(m.key)).map((m) => m.serviceId));
+    const train = (k) => k.split('|')[0];
+    const sentState = Object.fromEntries(Object.entries(nextState.sent).filter(([k]) => !retry.has(train(k))));
+    for (const [k, v] of Object.entries(prevSent)) if (retry.has(train(k))) sentState[k] = v;
+    for (const m of messages) if (!failed.has(m.key)) sentState[m.key] = true; // never resend a delivered one
     state[key] = { sent: sentState, last: nextState.last };
   }
   await writeText(statePath, `${JSON.stringify(state, null, 2)}\n`);

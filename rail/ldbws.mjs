@@ -34,23 +34,17 @@ function normalise(s) {
   };
 }
 
-// window: minutes either side of now (LDBWS timeWindow, 1-120).
-export async function getBoard({ from, to, window = 120, numRows = 9, fetchImpl = fetch } = {}) {
+export async function getBoard({ from, to, fetchImpl = fetch } = {}) {
   const fromCrs = crs(from, 'from');
   const toCrs = crs(to, 'to');
-  if (!Number.isInteger(window) || window < 1 || window > 120) {
-    throw new Error('window must be an integer 1-120');
-  }
-  if (!Number.isInteger(numRows) || numRows < 1 || numRows > 9) {
-    throw new Error('numRows must be an integer 1-9');
-  }
 
   const { base, key } = credentials();
   const url = new URL(`${base}/GetDepBoardWithDetails/${fromCrs}`);
   url.searchParams.set('filterCrs', toCrs);
   url.searchParams.set('filterType', 'to');
-  url.searchParams.set('numRows', String(numRows));
-  url.searchParams.set('timeWindow', String(window));
+  // LDBWS maximums: 9 rows, 120 minutes ahead.
+  url.searchParams.set('numRows', '9');
+  url.searchParams.set('timeWindow', '120');
 
   const res = await fetchImpl(url, {
     headers: { 'x-apikey': key, accept: 'application/json' },

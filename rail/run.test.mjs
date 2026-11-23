@@ -279,6 +279,20 @@ test('a failed send is retried on the next tick instead of being marked sent', a
   assert.equal(second.failed.length, 0);
 });
 
+test('a failed "on time again" send is retried, not lost with the delay record', async () => {
+  const fs = memoryFs();
+  const board = (etd) =>
+    fakeFetch({ crs: 'EUS', filtercrs: 'HML', trainServices: [{ serviceID: 'A', std: '16:40', etd, platform: '5' }] }).impl;
+  const poll = (etd, send) =>
+    runOnce({ now: new Date('2026-11-23T16:20:00Z'), config: CONFIG, fetchImpl: board(etd), send, ...fs });
+
+  assert.deepEqual((await poll('16:50', async () => true)).messages.map((m) => m.kind), ['late']);
+  assert.deepEqual((await poll('On time', async () => false)).failed, ['A|ontime|ontime']);
+  const retry = await poll('On time', async () => true);
+  assert.deepEqual(retry.messages.map((m) => m.kind), ['ontime']);
+  assert.equal((await poll('On time', async () => true)).messages.length, 0);
+});
+
 // --- 429/5xx backoff -------------------------------------------------------
 
 function failingFetch(status) {

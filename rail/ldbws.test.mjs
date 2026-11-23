@@ -60,7 +60,7 @@ test('EUS to HML: "Delayed" etd is kept as text, not guessed', async () => {
 
 test('calls GetDepBoardWithDetails with filterCrs/filterType=to and x-apikey', async () => {
   const { impl, calls } = fakeFetch(fixture('hml-to-eus.json'));
-  await getBoard({ from: 'HML', to: 'EUS', window: 120, numRows: 9, fetchImpl: impl });
+  await getBoard({ from: 'HML', to: 'EUS', fetchImpl: impl });
 
   assert.equal(calls.length, 1);
   const url = new URL(calls[0].url);
@@ -141,9 +141,3 @@ test('rejects lowercase or non-3-letter CRS codes', async () => {
   await assert.rejects(() => getBoard({ from: 'HML', to: 'EUSTON', fetchImpl: impl }), /to must be/);
 });
 
-test('rejects window outside 1-120 and numRows outside 1-9', async () => {
-  const { impl } = fakeFetch(fixture('hml-to-eus.json'));
-  await assert.rejects(() => getBoard({ from: 'HML', to: 'EUS', window: 0, fetchImpl: impl }), /window/);
-  await assert.rejects(() => getBoard({ from: 'HML', to: 'EUS', window: 121, fetchImpl: impl }), /window/);
-  await assert.rejects(() => getBoard({ from: 'HML', to: 'EUS', numRows: 10, fetchImpl: impl }), /numRows/);
-});
