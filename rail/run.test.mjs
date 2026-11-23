@@ -45,18 +45,18 @@ const CONFIG = {
 
 // --- window gate -----------------------------------------------------------
 
-test('weekday morning window is HML to EUS, 07:00 <= t < 09:00', () => {
+test('weekday morning window is HML to EUS, 07:00 <= t < 10:00', () => {
   assert.equal(windowFor(new Date('2026-11-23T07:00:00Z')).from, 'HML');
-  assert.equal(windowFor(new Date('2026-11-23T08:59:00Z')).from, 'HML');
-  assert.equal(windowFor(new Date('2026-11-23T09:00:00Z')), null);
+  assert.equal(windowFor(new Date('2026-11-23T09:59:00Z')).from, 'HML');
+  assert.equal(windowFor(new Date('2026-11-23T10:00:00Z')), null);
   assert.equal(windowFor(new Date('2026-11-23T06:59:00Z')), null);
 });
 
-test('weekday evening window is EUS to HML, 17:00 <= t < 19:00', () => {
-  assert.equal(windowFor(new Date('2026-11-23T17:00:00Z')).from, 'EUS');
+test('weekday evening window is EUS to HML, 16:00 <= t < 19:00', () => {
+  assert.equal(windowFor(new Date('2026-11-23T16:00:00Z')).from, 'EUS');
   assert.equal(windowFor(new Date('2026-11-23T18:59:00Z')).from, 'EUS');
   assert.equal(windowFor(new Date('2026-11-23T19:00:00Z')), null);
-  assert.equal(windowFor(new Date('2026-11-23T16:59:00Z')), null);
+  assert.equal(windowFor(new Date('2026-11-23T15:59:00Z')), null);
 });
 
 test('weekend has no window', () => {
@@ -84,7 +84,7 @@ test('outside a window nothing is fetched and nothing is published', async () =>
   const { impl, calls } = fakeFetch(fixture('hml-to-eus.json'));
   const fs = memoryFs();
   const r = await runOnce({
-    now: new Date('2026-11-23T09:00:00Z'),
+    now: new Date('2026-11-23T10:00:00Z'),
     config: CONFIG,
     fetchImpl: impl,
     readText: fs.readText,

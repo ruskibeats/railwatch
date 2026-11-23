@@ -1,8 +1,8 @@
 // Rail 3: the paperclip runner.
 //
 // Gates (all in Europe/London, weekday only):
-//   07:00-09:00  HML -> EUS
-//   17:00-19:00  EUS -> HML
+//   07:00-10:00  HML -> EUS
+//   16:00-19:00  EUS -> HML
 // Nothing is fetched, published or sent outside a window, on a weekend, on a
 // UK bank holiday, or on an `off:` date. Every gate has a test in run.test.mjs.
 //
@@ -18,10 +18,10 @@ import { decide } from './alerts.mjs';
 import { loadBankHolidays } from './holidays.mjs';
 import { makeSender } from './notify.mjs';
 
-// Half-open [start, end): a poll at exactly 09:00 or 19:00 is outside.
+// Half-open [start, end): a poll at exactly 10:00 or 19:00 is outside.
 export const WINDOWS = Object.freeze([
-  { from: 'HML', to: 'EUS', start: 7 * 60, end: 9 * 60 },
-  { from: 'EUS', to: 'HML', start: 17 * 60, end: 19 * 60 },
+  { from: 'HML', to: 'EUS', start: 7 * 60, end: 10 * 60 },
+  { from: 'EUS', to: 'HML', start: 16 * 60, end: 19 * 60 },
 ]);
 
 const LONDON = new Intl.DateTimeFormat('en-GB', {

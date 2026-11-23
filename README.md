@@ -13,7 +13,7 @@ checkout: it needs root for the SSH hop to caddy and to read
 
 | Gate | Rule |
 | --- | --- |
-| window | weekdays 07:00-09:00 HML→EUS, 17:00-19:00 EUS→HML (Europe/London), half-open |
+| window | weekdays 07:00-10:00 HML→EUS, 16:00-19:00 EUS→HML (Europe/London), half-open |
 | weekend | no poll |
 | bank holiday | no poll (gov.uk `england-and-wales`, cached daily) |
 | off date | no poll (`off:` in `/etc/uclh-rail/config.json`) |
