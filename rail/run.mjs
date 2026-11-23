@@ -10,12 +10,13 @@
 // per direction, run the TEC-430 alert rules with per-change dedupe, and send
 // each new message once through caddy.
 
-import { readFileSync, writeFileSync, mkdirSync, renameSync } from 'node:fs';
-import { dirname } from 'node:path';
+import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { getBoard } from './ldbws.mjs';
-import { decide } from './alerts.mjs';
-import { loadBankHolidays } from './holidays.mjs';
+import { decide, londonNow } from './alerts.mjs';
+import { loadBankHolidays, defaultWrite } from './holidays.mjs';
+
+export { londonNow };
 import { makeSender } from './notify.mjs';
 
 // Half-open [start, end): a poll at exactly 10:00 or 19:00 is outside.
@@ -23,26 +24,6 @@ export const WINDOWS = Object.freeze([
   { from: 'HML', to: 'EUS', start: 7 * 60, end: 10 * 60 },
   { from: 'EUS', to: 'HML', start: 16 * 60, end: 19 * 60 },
 ]);
-
-const LONDON = new Intl.DateTimeFormat('en-GB', {
-  timeZone: 'Europe/London',
-  weekday: 'short',
-  year: 'numeric',
-  month: '2-digit',
-  day: '2-digit',
-  hour: '2-digit',
-  minute: '2-digit',
-  hour12: false,
-});
-
-export function londonNow(date) {
-  const p = Object.fromEntries(LONDON.formatToParts(date).map((x) => [x.type, x.value]));
-  return {
-    date: `${p.year}-${p.month}-${p.day}`,
-    weekday: p.weekday,
-    minutes: (Number(p.hour) % 24) * 60 + Number(p.minute),
-  };
-}
 
 // The active direction window, or null when nothing should run.
 export function windowFor(date) {
@@ -69,13 +50,6 @@ export const BACKOFF_MAX_MS = 10 * 60 * 1000;
 
 export function backoffMs(failures) {
   return Math.min(BACKOFF_BASE_MS * 2 ** Math.max(0, failures - 1), BACKOFF_MAX_MS);
-}
-
-function defaultWrite(path, text) {
-  mkdirSync(dirname(path), { recursive: true });
-  const tmp = `${path}.tmp`;
-  writeFileSync(tmp, text);
-  renameSync(tmp, path);
 }
 
 // One poll. Testable without network or disk: inject fetchImpl, send,
@@ -175,6 +149,29 @@ export async function runOnce({
   };
 }
 
+// A broken run (expired key, gov.uk down with no cache, a bug) is silent on
+// WhatsApp, and silence reads as "all trains on time". Say so, once per day.
+export async function alertFailureOnce({
+  now,
+  stateDir,
+  reason,
+  send,
+  readText = (p) => readFileSync(p, 'utf8'),
+  writeText = defaultWrite,
+}) {
+  const path = `${stateDir}/failure-alert.json`;
+  const today = londonNow(now).date;
+  try {
+    if (JSON.parse(await readText(path)).date === today) return false;
+  } catch {
+    // Never alerted.
+  }
+  const text = `*\`\`\`⚠️🚆 Rail alerts not working\`\`\`*\n\n\`\`\`${reason}\`\`\``;
+  if (!(await send(text))) return false;
+  await writeText(path, `${JSON.stringify({ date: today, reason })}\n`);
+  return true;
+}
+
 export function loadConfig(path = process.env.RAIL_CONFIG ?? '/etc/uclh-rail/config.json') {
   return JSON.parse(readFileSync(path, 'utf8'));
 }
@@ -190,24 +187,27 @@ async function main() {
   }
 
   const config = loadConfig();
-
   const stateDir = config.stateDir ?? '/var/lib/uclh-rail';
-  const holidays = await loadBankHolidays({
-    cachePath: `${stateDir}/bank-holidays.json`,
-    today: londonNow(now).date,
-  });
-
   const send = makeSender({ ...(config.notify ?? {}), to: config.to, dry });
-  const result = await runOnce({ now, config, holidays, send });
+  // --dry must not record alerts as sent, or the real timer would skip them.
+  const writeText = dry ? () => {} : defaultWrite;
+
+  let result;
+  try {
+    const holidays = await loadBankHolidays({
+      cachePath: `${stateDir}/bank-holidays.json`,
+      today: londonNow(now).date,
+    });
+    result = await runOnce({ now, config, holidays, send, writeText });
+    if (result.skipped === 'fetch-error') throw new Error(`${result.window} fetch failed: ${result.error}`);
+  } catch (err) {
+    await alertFailureOnce({ now, stateDir, reason: err.message, send, writeText });
+    throw err;
+  }
 
   if (result.skipped === 'backoff') {
     const detail = result.error ? ` (${result.error})` : '';
     console.log(`[${now.toISOString()}] ${result.window} backing off until ${result.retryAt}${detail}`);
-    return;
-  }
-  if (result.skipped === 'fetch-error') {
-    console.error(`[${now.toISOString()}] ${result.window} fetch failed: ${result.error}`);
-    process.exitCode = 1;
     return;
   }
   if (result.skipped) {
@@ -221,7 +221,7 @@ async function main() {
 
 if (process.argv[1] === fileURLToPath(import.meta.url)) {
   main().catch((err) => {
-    console.error(err.message);
+    console.error(`[${new Date().toISOString()}] ${err.message}`);
     process.exitCode = 1;
   });
 }

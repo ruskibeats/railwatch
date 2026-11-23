@@ -10,7 +10,8 @@ import { dirname } from 'node:path';
 
 export const GOV_URL = 'https://www.gov.uk/bank-holidays.json';
 
-function defaultWrite(path, text) {
+// Write via a temp file and rename, so a reader never sees half a file.
+export function defaultWrite(path, text) {
   mkdirSync(dirname(path), { recursive: true });
   const tmp = `${path}.tmp`;
   writeFileSync(tmp, text);

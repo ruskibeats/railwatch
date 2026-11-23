@@ -50,10 +50,11 @@ node rail/run.mjs --dry   # gate check + print, no send
 node --test               # all rules, no network
 ```
 
-`--dry` only suppresses the WhatsApp send. Inside an open window it still
-fetches from LDBWS and writes the publish/state files, so it is not a full
-offline mode. Transient LDBWS failures (429/5xx) set a cooldown in the state
-file (2, 4, 8, 10 minutes) so the 2-minute timer does not hammer the API.
+`--dry` prints alerts instead of sending them and writes nothing (no board, no
+state), so a test run never uses up a real alert. Inside an open window it still
+calls LDBWS. If a run fails (bad key, a bug, gov.uk down with no cache) you get
+one "Rail alerts not working" WhatsApp per day, so silence means no news. Transient LDBWS failures (429/5xx) set a cooldown in the state
+file (2, 4, 8, 10 minutes) so the 1-minute timer does not hammer the API.
 
 ## Install and upgrade
 

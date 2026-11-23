@@ -1,7 +1,7 @@
 import { test, beforeEach } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
-import { windowFor, londonNow, isBankHoliday, isOff, runOnce, backoffMs } from './run.mjs';
+import { windowFor, londonNow, isBankHoliday, isOff, runOnce, backoffMs, alertFailureOnce } from './run.mjs';
 import { loadBankHolidays } from './holidays.mjs';
 
 const fixture = (name) =>
@@ -264,7 +264,7 @@ test('a failed send is retried on the next tick instead of being marked sent', a
     send,
   });
   assert.equal(first.sent, 0);
-  assert.equal(first.failed.length, 1);
+  assert.equal(first.failed.length, 2);
 
   fail = false;
   const second = await runOnce({
@@ -275,7 +275,7 @@ test('a failed send is retried on the next tick instead of being marked sent', a
     writeText: fs.writeText,
     send,
   });
-  assert.equal(second.sent, 1);
+  assert.equal(second.sent, 2);
   assert.equal(second.failed.length, 0);
 });
 
@@ -419,4 +419,29 @@ test('if gov.uk is down, the stale cached list is used', async () => {
     writeText: fs.writeText,
   });
   assert.equal(events[0].date, '2026-12-25');
+});
+
+// --- failure alert ---------------------------------------------------------
+
+test('a broken run alerts once per London day, and retries if the send fails', async () => {
+  const fs = memoryFs();
+  const sent = [];
+  let ok = false;
+  const send = async (t) => {
+    sent.push(t);
+    return ok;
+  };
+  const args = { stateDir: '/state', reason: 'HML-EUS fetch failed: HTTP 401 Unauthorized', send, readText: fs.readText, writeText: fs.writeText };
+
+  // Send fails: nothing recorded, so the next minute tries again.
+  assert.equal(await alertFailureOnce({ ...args, now: new Date('2026-11-23T07:00:00Z') }), false);
+  ok = true;
+  assert.equal(await alertFailureOnce({ ...args, now: new Date('2026-11-23T07:01:00Z') }), true);
+  assert.match(sent[1], /Rail alerts not working/);
+  assert.match(sent[1], /HTTP 401/);
+
+  // Same day: quiet. Next day: one more.
+  assert.equal(await alertFailureOnce({ ...args, now: new Date('2026-11-23T17:00:00Z') }), false);
+  assert.equal(await alertFailureOnce({ ...args, now: new Date('2026-11-24T07:00:00Z') }), true);
+  assert.equal(sent.length, 3);
 });

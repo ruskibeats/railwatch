@@ -10,13 +10,10 @@
 //   - cancelled                          -> one message per train
 //   - expected >= 5 min late             -> one message, then again only when
 //                                           the estimate moves 5+ min further
-//   - a train whose std has passed       -> no late/platform/timing alerts
-//     (std + 2 min grace); a cancellation still alerts
+//   - a train 2+ min past its expected   -> no late/platform/recovery alerts;
+//     departure (etd, else std)             a cancellation still alerts
 //   - platform change within 10 min      -> one message per distinct platform
 //   - "Delayed" with no time             -> treated as a delay, one message
-//   - after its booked time a train is silent. Darwin keeps a departed service
-//     listed and still moving its estimate, so without this every departure
-//     produced "delayed" messages minutes after the train left
 //   - a train we alerted a delay for
 //     that is "On time" again            -> one "now on time" message
 //
@@ -36,18 +33,34 @@
 
 const LONDON = new Intl.DateTimeFormat('en-GB', {
   timeZone: 'Europe/London',
+  weekday: 'short',
+  year: 'numeric',
+  month: '2-digit',
+  day: '2-digit',
   hour: '2-digit',
   minute: '2-digit',
   hour12: false,
 });
+
+// London calendar day, weekday and minutes since midnight. The one clock both
+// the window gate (run.mjs) and the alert rules use.
+export function londonNow(date) {
+  const p = Object.fromEntries(LONDON.formatToParts(date).map((x) => [x.type, x.value]));
+  return {
+    date: `${p.year}-${p.month}-${p.day}`,
+    weekday: p.weekday,
+    minutes: (Number(p.hour) % 24) * 60 + Number(p.minute),
+  };
+}
 
 const HHMM = /^(\d{1,2}):(\d{2})$/;
 
 // Alert on the first 5+ min delay, then only when it gets 5 min worse:
 // "Now 18:11, 5 min late", "Now 18:16, 10 min late", not every minute.
 const LATE_STEP_MIN = 5;
-// A train is treated as gone 2 min after its booked time (Darwin keeps showing
-// it as "On time" for a while after it leaves).
+// A train is treated as gone 2 min after its expected departure (etd, or std
+// when it is on time). Never std alone: a late train is still on the platform
+// after its booked time, and that is when its delay alerts matter most.
 const GONE_GRACE_MIN = 2;
 
 function lateBucket(lateMin) {
@@ -64,12 +77,6 @@ function toMinutes(value) {
   return h * 60 + min;
 }
 
-function londonMinutes(date) {
-  const parts = LONDON.formatToParts(date);
-  const h = Number(parts.find((p) => p.type === 'hour').value) % 24;
-  const m = Number(parts.find((p) => p.type === 'minute').value);
-  return h * 60 + m;
-}
 
 
 // WhatsApp layout, read at a glance on a phone (Russell 2026-11-22):
@@ -119,7 +126,7 @@ export function decide(prevState, board, now) {
 
   const at = now instanceof Date ? now : new Date(now);
   if (Number.isNaN(at.getTime())) throw new Error('now must be a valid date');
-  const nowMin = londonMinutes(at);
+  const nowMin = londonNow(at).minutes;
 
   const services = Array.isArray(board?.services) ? board.services : [];
   const from = board?.crs ?? '?';
@@ -155,8 +162,9 @@ export function decide(prevState, board, now) {
     const isDelayedText = s.etd === 'Delayed';
     const isLate = isDelayedText || (stdMin !== null && etdMin !== null && etdMin - stdMin >= 5);
 
-    // Once the booked time has passed, Darwin's estimate is no longer news.
-    const gone = stdMin !== null && nowMin > stdMin + GONE_GRACE_MIN;
+    // "Delayed" (no estimate) is never gone: it has not left.
+    const departs = etdMin ?? (isDelayedText ? null : stdMin);
+    const gone = departs !== null && nowMin > departs + GONE_GRACE_MIN;
 
     if (isLate) {
       const lateMin = isDelayedText ? null : etdMin - stdMin;
@@ -167,10 +175,13 @@ export function decide(prevState, board, now) {
         const text = isDelayedText
           ? lines(`⏳🚆 ${label} delayed`, 'No estimate yet', s.delayReason)
           : lines(`🐢🚆 ${label} delayed`, `Now ${s.etd}, ${lateMin} min late`, s.delayReason);
+        delete nextSent[`${s.id}|ontime|ontime`];
         emit(s.id, 'late', isDelayedText ? 'delayed' : String(bucket), text);
       }
     } else if (s.etd === 'On time' && !gone && lateBucketSent(prevSent, s.id) !== null) {
       emit(s.id, 'ontime', 'ontime', lines(`✅🚆 ${label} on time again`));
+      // Forget the old delay, so a fresh one later alerts from 5 min again.
+      for (const key of Object.keys(nextSent)) if (key.startsWith(`${s.id}|late|`)) delete nextSent[key];
     }
 
     // Platform reference: first sight sets it. Inside the 10-minute window a
