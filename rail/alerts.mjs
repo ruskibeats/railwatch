@@ -4,7 +4,7 @@
 //
 // A "board" is the normalised object from ldbws.mjs:
 //   { crs, filterCrs, generatedAt, services: [{ id, std, etd, platform,
-//     cancelled, delayReason, operator }] }
+//     cancelled, delayReason, cancelReason, operator }] }
 //
 // Rules (TEC-430):
 //   - cancelled                          -> one message per train
@@ -54,6 +54,35 @@ function londonMinutes(date) {
   return h * 60 + m;
 }
 
+
+// WhatsApp layout, read at a glance on a phone (Russell 2026-11-22):
+//   title   bold monospace - the train and what happened
+//   notice  bold monospace - the one fact to act on (next train, new time)
+//   reason  plain monospace - Darwin's full sentence, when there is one
+// separated by blank lines. ```...``` is WhatsApp's monospace; *...* around it
+// makes it bold. Empty parts are left out.
+function lines(title, notice, reason) {
+  const part = (v) => (typeof v === 'string' && v.trim() ? v.trim() : null);
+  const mono = (v) => `\`\`\`${v}\`\`\``;
+  return [
+    part(title) && `*${mono(part(title))}*`,
+    part(notice) && `*${mono(part(notice))}*`,
+    part(reason) && mono(part(reason)),
+  ]
+    .filter(Boolean)
+    .join('\n\n');
+}
+
+// The next train that is still running, so a cancellation comes with a plan B.
+function nextRunning(services, after) {
+  const n = services.slice(after + 1).find((s) => !(s.cancelled === true || s.etd === 'Cancelled'));
+  if (!n?.std) return null;
+  if (n.etd === 'On time') return `Next: ${n.std}, on time`;
+  if (HHMM.test(n.etd ?? '')) return `Next: ${n.std}, expected ${n.etd}`;
+  if (n.etd === 'Delayed') return `Next: ${n.std}, delayed`;
+  return `Next: ${n.std}`;
+}
+
 function wasLate(sent, serviceId) {
   const prefix = `${serviceId}|late|`;
   return Object.keys(sent).some((key) => key.startsWith(prefix));
@@ -88,12 +117,12 @@ export function decide(prevState, board, now) {
     messages.push({ serviceId, kind, value, key, text });
   };
 
-  for (const s of services) {
+  for (const [i, s] of services.entries()) {
     if (!s.id) continue;
     const label = `${s.std ?? '?'} ${from}\u2192${to}`;
 
     if (s.cancelled === true || s.etd === 'Cancelled') {
-      emit(s.id, 'cancelled', 'cancelled', `❌🚆 ${label} is cancelled.`);
+      emit(s.id, 'cancelled', 'cancelled', lines(`❌🚆 ${label} cancelled`, nextRunning(services, i), s.cancelReason));
       continue;
     }
 
@@ -104,11 +133,11 @@ export function decide(prevState, board, now) {
 
     if (isLate) {
       const text = isDelayedText
-        ? `⏳🚆 ${label} is delayed (no estimate yet).`
-        : `🐢🚆 ${label} expected ${s.etd} (${etdMin - stdMin} min late).`;
+        ? lines(`⏳🚆 ${label} delayed`, 'No estimate yet', s.delayReason)
+        : lines(`🐢🚆 ${label} delayed`, `Now ${s.etd}, ${etdMin - stdMin} min late`, s.delayReason);
       emit(s.id, 'late', s.etd, text);
     } else if (s.etd === 'On time' && wasLate(prevSent, s.id)) {
-      emit(s.id, 'ontime', 'ontime', `✅🚆 ${label} is now on time.`);
+      emit(s.id, 'ontime', 'ontime', lines(`✅🚆 ${label} on time again`));
     }
 
     // Platform reference: first sight sets it. Inside the 10-minute window a
@@ -127,7 +156,7 @@ export function decide(prevState, board, now) {
       reference != null &&
       s.platform !== reference
     ) {
-      emit(s.id, 'platform', s.platform, `🔀🚉 ${label} platform changed ${reference} \u2192 ${s.platform}.`);
+      emit(s.id, 'platform', s.platform, lines(`🔀🚉 ${label} platform ${s.platform}`, `Was platform ${reference}`));
       reference = s.platform;
     }
     nextLast[s.id] = { platform: reference };

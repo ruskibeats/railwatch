@@ -6,9 +6,10 @@ Wants=network-online.target
 
 [Service]
 Type=oneshot
-# The live service runs the root-owned copy at /opt/uclh/railwatch as root.
-# systemd/rail-board.service.d/root-copy.conf sets that; install.sh puts both in place.
-User=paperclip
-Group=paperclip
+# Runs the root-owned copy at /opt/uclh/railwatch as root, never the
+# agent-writable checkout. Root is needed for the SSH hop to caddy and to read
+# /etc/uclh-rail/config.json (root 600). install.sh puts the copy in place.
+User=root
+Group=root
 EnvironmentFile=/etc/uclh-rail/ldbws.env
 ExecStart=/usr/bin/node /opt/uclh/railwatch/rail/run.mjs

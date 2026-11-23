@@ -39,6 +39,7 @@ test('HML to EUS: normalises each service to the agreed shape', async () => {
     platform: '1',
     cancelled: false,
     delayReason: null,
+    cancelReason: null,
     operator: 'London Northwestern Railway',
   });
   assert.equal(board.services[1].delayReason, 'Signalling fault near Watford Junction');

@@ -29,6 +29,7 @@ function normalise(s) {
     platform: s?.platform ?? null,
     cancelled: s?.isCancelled === true || s?.etd === 'Cancelled',
     delayReason: s?.delayReason ?? null,
+    cancelReason: s?.cancelReason ?? null,
     operator: s?.operator ?? null,
   };
 }

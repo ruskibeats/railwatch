@@ -7,12 +7,12 @@
 #   ./install.sh --dry      print the plan, change nothing
 #
 # Runtime: the service does not run from this checkout. install copies the tree
-# to RUNTIME_DIR (/opt/uclh/railwatch, root-owned) and installs the drop-in
-# systemd/rail-board.service.d/root-copy.conf, so the unit runs as root with
-# ExecStart=/opt/uclh/railwatch/rail/run.mjs. Re-run install to upgrade.
-# Permissions: the script creates the state and publish dirs owned by
-# paperclip. Confirm with Russell before the first install if /srv/estate
-# uses a group layout.
+# HEAD (git archive) to RUNTIME_DIR (/opt/uclh/railwatch, root-owned) and the
+# unit runs it as root. Re-run install to upgrade.
+# Permissions: the state and publish dirs are root-owned, because the service
+# writes them as root and an agent-owned dir would let paperclip symlink those
+# writes onto any file. Confirm with Russell before the first install if
+# /srv/estate uses a group layout.
 set -euo pipefail
 
 REPO_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -24,7 +24,8 @@ CONFIG="$CONFIG_DIR/config.json"
 STATE_DIR="/var/lib/uclh-rail"
 PUBLISH_DIR="/srv/estate/publish/rail"
 UNITS=(rail-board.service rail-board.timer)
-FILES=(rail-board.service rail-board.timer rail-board.service.d/root-copy.conf)
+# Left behind by the PR #7 installer; superseded by User=root in the unit.
+OLD_DROPIN="$UNIT_DIR/rail-board.service.d/root-copy.conf"
 STAMP="$(date -u +%Y%m%dT%H%M%SZ)"
 
 MODE=install
@@ -40,21 +41,28 @@ if [ "$(id -u)" != "0" ] && [ "$MODE" != "dry" ]; then
   exit 1
 fi
 
+# Back up once, before the first install, so --backout restores the pre-railwatch
+# units. Backing up on every run would make backout restore our own units.
 backup_units() {
+  [ -f "$BACKUP_ROOT/latest" ] && return
   mkdir -p "$BACKUP_ROOT/$STAMP"
-  for f in "${FILES[@]}"; do
+  for f in "${UNITS[@]}"; do
     if [ -f "$UNIT_DIR/$f" ]; then
-      mkdir -p "$BACKUP_ROOT/$STAMP/$(dirname "$f")"
       cp -a "$UNIT_DIR/$f" "$BACKUP_ROOT/$STAMP/$f"
     fi
   done
   printf '%s\n' "$STAMP" > "$BACKUP_ROOT/latest"
 }
 
+remove_old_dropin() {
+  rm -f "$OLD_DROPIN"
+  rmdir "$(dirname "$OLD_DROPIN")" 2>/dev/null || true
+}
+
 do_install() {
   if [ "$MODE" = "dry" ]; then
-    echo "DRY: would copy the tree to $RUNTIME_DIR (root-owned) unless already running from there"
-    echo "DRY: would install ${FILES[*]} into $UNIT_DIR, create $STATE_DIR and $PUBLISH_DIR,"
+    echo "DRY: would replace $RUNTIME_DIR with git HEAD (root-owned) unless already running from there"
+    echo "DRY: would install ${UNITS[*]} into $UNIT_DIR, create root-owned $STATE_DIR and $PUBLISH_DIR,"
     echo "DRY: create $CONFIG from config.example.json if missing, and enable rail-board.timer"
     return
   fi
@@ -65,19 +73,26 @@ do_install() {
     echo "created $CONFIG from the example - edit the number, off dates and token before it alerts"
   fi
 
-  install -d -m 0750 -o paperclip -g paperclip "$STATE_DIR"
-  install -d -m 0755 -o paperclip -g paperclip "$PUBLISH_DIR"
+  install -d -m 0750 -o root -g root "$STATE_DIR"
+  install -d -m 0755 -o root -g root "$PUBLISH_DIR"
+  chown -R root:root "$STATE_DIR" "$PUBLISH_DIR"
 
   if [ "$REPO_DIR" != "$RUNTIME_DIR" ]; then
+    # Committed files only: no ignored secrets, no stale files, root-owned 0644/0755.
+    # Archive first so a git failure leaves the old runtime untouched.
+    # safe.directory: root running git in the paperclip-owned checkout.
+    install -d -m 0700 "$BACKUP_ROOT"
+    git -c safe.directory="$REPO_DIR" -C "$REPO_DIR" archive -o "$BACKUP_ROOT/runtime.tar" HEAD
+    rm -rf "$RUNTIME_DIR"
     install -d -m 0755 "$RUNTIME_DIR"
-    tar -C "$REPO_DIR" --exclude=./.git -cf - . | tar -C "$RUNTIME_DIR" -xf -
-    chown -R root:root "$RUNTIME_DIR"
-    echo "copied $REPO_DIR -> $RUNTIME_DIR"
+    tar -C "$RUNTIME_DIR" --no-same-owner -xf "$BACKUP_ROOT/runtime.tar"
+    echo "copied $REPO_DIR HEAD -> $RUNTIME_DIR"
   fi
 
   backup_units
-  for f in "${FILES[@]}"; do
-    install -D -m 0644 "$REPO_DIR/systemd/$f" "$UNIT_DIR/$f"
+  remove_old_dropin
+  for f in "${UNITS[@]}"; do
+    install -m 0644 "$REPO_DIR/systemd/$f" "$UNIT_DIR/$f"
   done
 
   systemctl daemon-reload
@@ -87,26 +102,26 @@ do_install() {
   printf 'enabled: %s\n' "$(systemctl is-enabled rail-board.timer)"
   printf 'active:  %s\n' "$(systemctl is-active rail-board.timer)"
   printf 'effective:\n'
-  systemctl cat rail-board.service --no-pager | grep -E '^(User|ExecStart)='
+  systemctl show -p User -p ExecStart rail-board.service
   systemctl list-timers rail-board.timer --no-pager
 }
 
 do_backout() {
   if [ "$MODE" = "dry" ]; then
-    echo "DRY: would disable rail-board.timer, remove ${FILES[*]}, and restore the last backup"
+    echo "DRY: would disable rail-board.timer, remove ${UNITS[*]}, and restore the pre-install backup"
     echo "DRY: leaves $RUNTIME_DIR, $STATE_DIR and $PUBLISH_DIR in place"
     return
   fi
   systemctl disable --now rail-board.timer 2>/dev/null || true
-  for f in "${FILES[@]}"; do
+  for f in "${UNITS[@]}"; do
     rm -f "$UNIT_DIR/$f"
   done
-  rmdir "$UNIT_DIR/rail-board.service.d" 2>/dev/null || true
+  remove_old_dropin
   if [ -f "$BACKUP_ROOT/latest" ]; then
     prev="$BACKUP_ROOT/$(cat "$BACKUP_ROOT/latest")"
-    for f in "${FILES[@]}"; do
+    for f in "${UNITS[@]}"; do
       if [ -f "$prev/$f" ]; then
-        install -D -m 0644 "$prev/$f" "$UNIT_DIR/$f"
+        install -m 0644 "$prev/$f" "$UNIT_DIR/$f"
       fi
     done
   fi

@@ -14,7 +14,9 @@ const DEFAULTS = {
 };
 
 export function makeSender({ to, caddy, remoteEnvFile, tokenEnv, endpoint, dry = false } = {}) {
-  const cfg = { ...DEFAULTS, caddy, remoteEnvFile, tokenEnv, endpoint };
+  // Only set keys override a default; `{ caddy: undefined }` must not wipe it.
+  const cfg = { ...DEFAULTS };
+  for (const [k, v] of Object.entries({ caddy, remoteEnvFile, tokenEnv, endpoint })) if (v != null) cfg[k] = v;
 
   return async function send(text) {
     if (dry || !to) {
@@ -30,7 +32,7 @@ export function makeSender({ to, caddy, remoteEnvFile, tokenEnv, endpoint, dry =
     return await new Promise((resolve) => {
       const child = spawn(
         'ssh',
-        ['-o', 'BatchMode=yes', '-o', 'ConnectTimeout=15', cfg.caddy, remote],
+        ['-o', 'BatchMode=yes', '-o', 'ConnectTimeout=15', '-o', 'ServerAliveInterval=10', '-o', 'ServerAliveCountMax=3', cfg.caddy, remote],
         { stdio: ['pipe', 'ignore', 'pipe'] },
       );
       let stderr = '';
@@ -42,6 +44,8 @@ export function makeSender({ to, caddy, remoteEnvFile, tokenEnv, endpoint, dry =
         if (code !== 0) console.error(`notify failed (ssh exit ${code}): ${stderr.slice(-300)}`);
         resolve(code === 0);
       });
+      // ssh can exit before reading stdin; EPIPE must not crash the run.
+      child.stdin.on('error', () => {});
       child.stdin.end(body);
     });
   };
