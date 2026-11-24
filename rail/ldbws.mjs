@@ -46,10 +46,17 @@ export async function getBoard({ from, to, fetchImpl = fetch } = {}) {
   url.searchParams.set('numRows', '9');
   url.searchParams.set('timeWindow', '120');
 
-  const res = await fetchImpl(url, {
-    headers: { 'x-apikey': key, accept: 'application/json' },
-    signal: AbortSignal.timeout(10000),
-  });
+  let res;
+  try {
+    res = await fetchImpl(url, {
+      headers: { 'x-apikey': key, accept: 'application/json' },
+      signal: AbortSignal.timeout(10000),
+    });
+  } catch (err) {
+    // A timeout or dropped connection is transient too: back off, don't alert.
+    err.retryable = true;
+    throw err;
+  }
   if (!res.ok) {
     // Deliberately no request headers or URL key in the message.
     const err = new Error(`LDBWS request failed: HTTP ${res.status} ${res.statusText}`);

@@ -141,3 +141,9 @@ test('rejects lowercase or non-3-letter CRS codes', async () => {
   await assert.rejects(() => getBoard({ from: 'HML', to: 'EUSTON', fetchImpl: impl }), /to must be/);
 });
 
+test('a timeout or network error is retryable, so one slow call does not alert', async () => {
+  const timeout = async () => {
+    throw new DOMException('The operation was aborted due to timeout', 'TimeoutError');
+  };
+  await assert.rejects(() => getBoard({ from: 'HML', to: 'EUS', fetchImpl: timeout }), (err) => err.retryable === true);
+});

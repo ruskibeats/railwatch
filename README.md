@@ -53,7 +53,7 @@ node --test               # all rules, no network
 `--dry` prints alerts instead of sending them and writes nothing (no board, no
 state), so a test run never uses up a real alert. Inside an open window it still
 calls LDBWS. If a run fails (bad key, a bug, gov.uk down with no cache) you get
-one "Rail alerts not working" WhatsApp per day, so silence means no news. Transient LDBWS failures (429/5xx) set a cooldown in the state
+one "Rail alerts not working" WhatsApp per day, so silence means no news. Transient LDBWS failures (429/5xx, timeouts, dropped connections) set a cooldown in the state
 file (2, 4, 8, 10 minutes) so the 1-minute timer does not hammer the API; the
 third failure in a row also counts as a failed run and sends the alert.
 
